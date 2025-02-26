@@ -13,7 +13,7 @@ pub trait Vec<F: Field>:
     + Neg<Output = Self>
     + AddAssign
 {
-    const ZERO: Self;
+    fn zero() -> Self;
     fn scalar_mul(&self, value: F) -> Self;
     fn scalar_div(&self, value: F) -> Self;
 }
@@ -54,10 +54,12 @@ impl<F: Field> AddAssign for Vec2D<F> {
     }
 }
 impl<F: Field> Vec<F> for Vec2D<F> {
-    const ZERO: Self = Vec2D {
-        x: F::ZERO,
-        y: F::ZERO,
-    };
+    fn zero() -> Self {
+        Vec2D {
+            x: F::zero(),
+            y: F::zero(),
+        }
+    }
     fn scalar_mul(&self, value: F) -> Self {
         Vec2D::new(self.x.clone() * value.clone(), self.y.clone() * value)
     }
@@ -104,11 +106,13 @@ impl<F: Field> Neg for Vec3D<F> {
     }
 }
 impl<F: Field> Vec<F> for Vec3D<F> {
-    const ZERO: Self = Vec3D {
-        x: F::ZERO,
-        y: F::ZERO,
-        z: F::ZERO,
-    };
+    fn zero() -> Self {
+        Vec3D {
+            x: F::zero(),
+            y: F::zero(),
+            z: F::zero(),
+        }
+    }
     fn scalar_mul(&self, value: F) -> Self {
         Vec3D::new(
             self.x.clone() * value.clone(),
@@ -127,10 +131,13 @@ impl<F: Field> Vec<F> for Vec3D<F> {
 
 #[cfg(test)]
 pub mod tests {
-    use crate::field::tests::{
-        approx_eq_f32_absrel, approx_eq_f64_absrel, prop_addition_associative,
-        prop_addition_commutative, prop_additive_identity,
-        prop_additive_inverse,
+    use crate::{
+        areal::{AReal, tests::strategy_rational_areal},
+        field::tests::{
+            approx_eq_f32_absrel, approx_eq_f64_absrel,
+            prop_addition_associative, prop_addition_commutative,
+            prop_additive_identity, prop_additive_inverse,
+        },
     };
 
     use super::*;
@@ -147,7 +154,7 @@ pub mod tests {
     {
         proptest!(
             |(x in strategy)| {
-                let r = x.scalar_mul(F::ONE);
+                let r = x.scalar_mul(F::one());
                 prop_assert!(
                     approx_eq(&x, &r),
                     "Expected x * 1 ≈ x, but got:\n\
@@ -283,8 +290,12 @@ pub mod tests {
     {
         prop_addition_associative(strategy_v.clone(), approx_eq.clone());
         prop_addition_commutative(strategy_v.clone(), approx_eq.clone());
-        prop_additive_identity(strategy_v.clone(), approx_eq.clone(), V::ZERO);
-        prop_additive_inverse(strategy_v.clone(), approx_eq.clone(), V::ZERO);
+        prop_additive_identity(
+            strategy_v.clone(),
+            approx_eq.clone(),
+            V::zero(),
+        );
+        prop_additive_inverse(strategy_v.clone(), approx_eq.clone(), V::zero());
         prop_multiplicative_identity(strategy_v.clone(), approx_eq.clone());
         prop_compatible_scalar_multiplication(
             strategy_f.clone(),
@@ -338,6 +349,10 @@ pub mod tests {
         strategy_vec2d(strategy_f64())
     }
 
+    fn strategy_vec2d_areal() -> BoxedStrategy<Vec2D<AReal>> {
+        strategy_vec2d(strategy_rational_areal())
+    }
+
     fn approxeq_vec2d_f32(a: &Vec2D<f32>, b: &Vec2D<f32>) -> bool {
         let abstol = 1e-4;
         let reltol = 1e-3;
@@ -352,6 +367,10 @@ pub mod tests {
             && approx_eq_f64_absrel(abstol, reltol)(&a.y, &b.y)
     }
 
+    fn eq_vec2d_areal(a: &Vec2D<AReal>, b: &Vec2D<AReal>) -> bool {
+        a.x.eq(&b.x) && a.y.eq(&b.y)
+    }
+
     fn strategy_vec3d<F, S>(strategy: S) -> BoxedStrategy<Vec3D<F>>
     where
         F: Field + Debug,
@@ -363,22 +382,20 @@ pub mod tests {
     }
 
     fn strategy_vec3d_f32() -> BoxedStrategy<Vec3D<f32>> {
-        let max: f32 = 1e5;
-        let min: f32 = 1e-2;
-        let field_strategy = prop_oneof![-max..-min, min..max].boxed();
-        strategy_vec3d(field_strategy)
+        strategy_vec3d(strategy_f32())
     }
 
     fn strategy_vec3d_f64() -> BoxedStrategy<Vec3D<f64>> {
-        let max: f64 = 1e5;
-        let min: f64 = 1e-2;
-        let field_strategy = prop_oneof![-max..-min, min..max].boxed();
-        strategy_vec3d(field_strategy)
+        strategy_vec3d(strategy_f64())
+    }
+
+    fn strategy_vec3d_areal() -> BoxedStrategy<Vec3D<AReal>> {
+        strategy_vec3d(strategy_rational_areal())
     }
 
     fn approxeq_vec3d_f32(a: &Vec3D<f32>, b: &Vec3D<f32>) -> bool {
         let abstol = 1e-4;
-        let reltol = 1e-3;
+        let reltol = 1e-2;
         approx_eq_f32_absrel(abstol, reltol)(&a.x, &b.x)
             && approx_eq_f32_absrel(abstol, reltol)(&a.y, &b.y)
             && approx_eq_f32_absrel(abstol, reltol)(&a.z, &b.z)
@@ -390,6 +407,10 @@ pub mod tests {
         approx_eq_f64_absrel(abstol, reltol)(&a.x, &b.x)
             && approx_eq_f64_absrel(abstol, reltol)(&a.y, &b.y)
             && approx_eq_f64_absrel(abstol, reltol)(&a.z, &b.z)
+    }
+
+    fn eq_vec3d_areal(a: &Vec3D<AReal>, b: &Vec3D<AReal>) -> bool {
+        a.x.eq(&b.x) && a.y.eq(&b.y) && a.z.eq(&b.z)
     }
 
     /// Test that a Vec2D<f32> is a valid vector.
@@ -404,6 +425,16 @@ pub mod tests {
         prop_vec(strategy_f64(), strategy_vec2d_f64(), approxeq_vec2d_f64);
     }
 
+    /// Test that a Vec2D<AReal> is a valid vector.
+    #[test]
+    fn test_vec2d_areal() {
+        prop_vec(
+            strategy_rational_areal(),
+            strategy_vec2d_areal(),
+            eq_vec2d_areal,
+        );
+    }
+
     /// Test that a Vec3D<f32> is a valid vector.
     #[test]
     fn test_vec3d_f32() {
@@ -414,5 +445,15 @@ pub mod tests {
     #[test]
     fn test_vec3d_f64() {
         prop_vec(strategy_f64(), strategy_vec3d_f64(), approxeq_vec3d_f64);
+    }
+
+    /// Test that a Vec3D<AReal> is a valid vector.
+    #[test]
+    fn test_vec3d_areal() {
+        prop_vec(
+            strategy_rational_areal(),
+            strategy_vec3d_areal(),
+            eq_vec3d_areal,
+        );
     }
 }

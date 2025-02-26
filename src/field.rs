@@ -3,6 +3,10 @@ use std::ops::{Add, AddAssign, Div, Mul, Neg, Sub};
 /// Mathematical field.
 ///
 /// See: https://en.wikipedia.org/wiki/Field_(mathematics)
+///
+/// NOTE: [`zero`] and [`one`] functions should be `const` values, but
+/// that is not possible with some implementations, such as algebraic
+/// numbers.
 pub trait Field:
     Sized
     + Clone
@@ -14,15 +18,19 @@ pub trait Field:
     + Neg<Output = Self>
     + AddAssign
 {
-    const ZERO: Self;
-    const ONE: Self;
+    fn zero() -> Self;
+    fn one() -> Self;
     fn inv(&self) -> Option<Self>;
 }
 
 /// Field implementation for f32.
 impl Field for f32 {
-    const ZERO: Self = 0f32;
-    const ONE: Self = 1f32;
+    fn zero() -> Self {
+        0f32
+    }
+    fn one() -> Self {
+        1f32
+    }
     fn inv(&self) -> Option<Self> {
         let reciprocal = 1f32 / self;
         if self.is_finite() && *self != 0f32 && reciprocal.is_finite() {
@@ -35,8 +43,12 @@ impl Field for f32 {
 
 /// Field implementation for f64.
 impl Field for f64 {
-    const ZERO: Self = 0f64;
-    const ONE: Self = 1f64;
+    fn zero() -> Self {
+        0f64
+    }
+    fn one() -> Self {
+        1f64
+    }
     fn inv(&self) -> Option<Self> {
         let reciprocal = 1f64 / self;
         if self.is_finite() && *self != 0f64 && reciprocal.is_finite() {
@@ -380,7 +392,7 @@ pub mod tests {
         S: Strategy<Value = F> + Clone,
         C: Fn(&F, &F) -> bool,
     {
-        prop_additive_identity(strategy, approx_eq, F::ZERO);
+        prop_additive_identity(strategy, approx_eq, F::zero());
     }
 
     /// Property test checking that the supplied value is a valid
@@ -417,7 +429,7 @@ pub mod tests {
         S: Strategy<Value = F> + Clone,
         C: Fn(&F, &F) -> bool,
     {
-        prop_multiplicative_identity(strategy, approx_eq, F::ONE);
+        prop_multiplicative_identity(strategy, approx_eq, F::one());
     }
 
     /// Property test that `neg` calculates an additive inverse.
@@ -447,7 +459,7 @@ pub mod tests {
         S: Strategy<Value = F> + Clone,
         C: Fn(&F, &F) -> bool,
     {
-        prop_additive_inverse(strategy, approx_eq, F::ZERO);
+        prop_additive_inverse(strategy, approx_eq, F::zero());
     }
 
     /// Property test that `inv` (where defined) calculates a multiplicative
@@ -463,7 +475,7 @@ pub mod tests {
                 if let Some(recip) = x.clone().inv() {
                     let r = x.clone() * recip;
                     prop_assert!(
-                        approx_eq(&F::ONE, &r),
+                        approx_eq(&F::one(), &r),
                         "Expected x * inv(x) ≈ 1, but got:\n\
                         x * inv(x) = {:?}\n",
                         r
@@ -551,6 +563,26 @@ pub mod tests {
                 );
             }
         )
+    }
+
+    /// Property test that encapsulates all the `Field` axioms.
+    pub fn prop_field<F, S, C>(strategy: S, approx_eq: C)
+    where
+        F: Field + Debug,
+        S: Strategy<Value = F> + Clone,
+        C: Fn(&F, &F) -> bool + Clone,
+    {
+        prop_addition_associative(strategy.clone(), approx_eq.clone());
+        prop_multiplication_associative(strategy.clone(), approx_eq.clone());
+        prop_addition_commutative(strategy.clone(), approx_eq.clone());
+        prop_multiplication_commutative(strategy.clone(), approx_eq.clone());
+        prop_additive_identity_field(strategy.clone(), approx_eq.clone());
+        prop_multiplicative_identity_field(strategy.clone(), approx_eq.clone());
+        prop_additive_inverse_field(strategy.clone(), approx_eq.clone());
+        prop_multiplicative_inverse(strategy.clone(), approx_eq.clone());
+        prop_distributivity(strategy.clone(), approx_eq.clone());
+        prop_add_sub_inverse(strategy.clone(), approx_eq.clone());
+        prop_mul_div_inverse(strategy.clone(), approx_eq.clone());
     }
 
     /// Default approximate equality for `f32``.
