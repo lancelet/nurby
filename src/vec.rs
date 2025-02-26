@@ -14,8 +14,8 @@ pub trait Vec<F: Field>:
     + AddAssign
 {
     const ZERO: Self;
-    fn scalar_mul(&self, value: &F) -> Self;
-    fn scalar_div(&self, value: &F) -> Self;
+    fn scalar_mul(&self, value: F) -> Self;
+    fn scalar_div(&self, value: F) -> Self;
 }
 
 /// 2D vector.
@@ -58,17 +58,11 @@ impl<F: Field> Vec<F> for Vec2D<F> {
         x: F::ZERO,
         y: F::ZERO,
     };
-    fn scalar_mul(&self, value: &F) -> Self {
-        Vec2D::new(
-            self.x.clone() * value.clone(),
-            self.y.clone() * value.clone(),
-        )
+    fn scalar_mul(&self, value: F) -> Self {
+        Vec2D::new(self.x.clone() * value.clone(), self.y.clone() * value)
     }
-    fn scalar_div(&self, value: &F) -> Self {
-        Vec2D::new(
-            self.x.clone() / value.clone(),
-            self.y.clone() / value.clone(),
-        )
+    fn scalar_div(&self, value: F) -> Self {
+        Vec2D::new(self.x.clone() / value.clone(), self.y.clone() / value)
     }
 }
 
@@ -115,18 +109,18 @@ impl<F: Field> Vec<F> for Vec3D<F> {
         y: F::ZERO,
         z: F::ZERO,
     };
-    fn scalar_mul(&self, value: &F) -> Self {
+    fn scalar_mul(&self, value: F) -> Self {
         Vec3D::new(
             self.x.clone() * value.clone(),
             self.y.clone() * value.clone(),
-            self.z.clone() * value.clone(),
+            self.z.clone() * value,
         )
     }
-    fn scalar_div(&self, value: &F) -> Self {
+    fn scalar_div(&self, value: F) -> Self {
         Vec3D::new(
             self.x.clone() / value.clone(),
             self.y.clone() / value.clone(),
-            self.z.clone() / value.clone(),
+            self.z.clone() / value,
         )
     }
 }
@@ -143,6 +137,7 @@ pub mod tests {
     use core::fmt::Debug;
     use proptest::prelude::*;
 
+    /// Property test checking the multiplicative identity of a vector.
     pub fn prop_multiplicative_identity<F, V, S, C>(strategy: S, approx_eq: C)
     where
         F: Field,
@@ -152,7 +147,7 @@ pub mod tests {
     {
         proptest!(
             |(x in strategy)| {
-                let r = x.scalar_mul(&F::ONE);
+                let r = x.scalar_mul(F::ONE);
                 prop_assert!(
                     approx_eq(&x, &r),
                     "Expected x * 1 ≈ x, but got:\n\
@@ -164,21 +159,153 @@ pub mod tests {
         )
     }
 
-    pub fn prop_vec<F, V, S, C>(strategy: S, approx_eq: C)
-    where
-        F: Field,
+    /// Property test checking the compatibility of scalar multiplication.
+    pub fn prop_compatible_scalar_multiplication<F, V, SF, SV, C>(
+        strategy_f: SF,
+        strategy_v: SV,
+        approx_eq: C,
+    ) where
+        F: Field + Debug,
         V: Vec<F> + Debug,
-        S: Strategy<Value = V> + Clone,
+        SF: Strategy<Value = F> + Clone,
+        SV: Strategy<Value = V> + Clone,
         C: Fn(&V, &V) -> bool + Clone,
     {
-        prop_addition_associative(strategy.clone(), approx_eq.clone());
-        prop_addition_commutative(strategy.clone(), approx_eq.clone());
-        prop_additive_identity(strategy.clone(), approx_eq.clone(), V::ZERO);
-        prop_additive_inverse(strategy.clone(), approx_eq.clone(), V::ZERO);
-        prop_multiplicative_identity(strategy.clone(), approx_eq.clone());
-        // TODO: Compatibility of scalar multiplication
-        // TODO: Distributivity of scalar multiplication wrt vector addition
-        // TODO: Distributivity of scalar multiplication wrt field addition
+        proptest!(
+            |(a in strategy_f.clone(), b in strategy_f, v in strategy_v)| {
+                let r1 = v.clone().scalar_mul(a.clone()).scalar_mul(b.clone());
+                let r2 = v.clone().scalar_mul(a * b);
+                prop_assert!(
+                    approx_eq(&r1, &r2),
+                    "Expected (v * a) * b ≈ v * (a * b), but got:\n\
+                    (v * a) * b = {:?}\n\
+                    v * (a * b) = {:?}\n",
+                    r1, r2
+                );
+            }
+        )
+    }
+
+    /// Property test checking distributivity of scalar multiplication with
+    /// respect to vector addition.
+    pub fn prop_distributivity_wrt_vectors<F, V, SF, SV, C>(
+        strategy_f: SF,
+        strategy_v: SV,
+        approx_eq: C,
+    ) where
+        F: Field + Debug,
+        V: Vec<F> + Debug,
+        SF: Strategy<Value = F> + Clone,
+        SV: Strategy<Value = V> + Clone,
+        C: Fn(&V, &V) -> bool + Clone,
+    {
+        proptest!(
+            |(a in strategy_f, u in strategy_v.clone(), v in strategy_v)| {
+                let r1 = (u.clone() + v.clone()).scalar_mul(a.clone());
+                let r2 = u.scalar_mul(a.clone()) + v.scalar_mul(a);
+                prop_assert!(
+                    approx_eq(&r1, &r2),
+                    "Expected (u + v) * a ≈ u * a + u * v, but got:\n\
+                    (u + v) * a   = {:?}\n\
+                    u * a + u * v = {:?}\n",
+                    r1, r2
+                );
+            }
+        )
+    }
+
+    /// Property test checking distributivity of scalar multiplication with
+    /// respect to field addition.
+    pub fn prop_distributivity_wrt_field<F, V, SF, SV, C>(
+        strategy_f: SF,
+        strategy_v: SV,
+        approx_eq: C,
+    ) where
+        F: Field + Debug,
+        V: Vec<F> + Debug,
+        SF: Strategy<Value = F> + Clone,
+        SV: Strategy<Value = V> + Clone,
+        C: Fn(&V, &V) -> bool + Clone,
+    {
+        proptest!(
+            |(a in strategy_f.clone(), b in strategy_f, v in strategy_v)| {
+                let r1 = v.clone().scalar_mul(a.clone() + b.clone());
+                let r2 = v.clone().scalar_mul(a) + v.scalar_mul(b);
+                prop_assert!(
+                    approx_eq(&r1, &r2),
+                    "Expected v * (a + b) ≈ v * a + v * b, but got:\n\
+                    v * (a + b)   = {:?}\n\
+                    v * a + v * b = {:?}\n",
+                    r1, r2
+                );
+            }
+        )
+    }
+
+    /// Property test to check that scalar multiplication and scalar division
+    /// are inverses.
+    pub fn prop_scalar_mul_div_inverse<F, V, SF, SV, C>(
+        strategy_f: SF,
+        strategy_v: SV,
+        approx_eq: C,
+    ) where
+        F: Field + Debug,
+        V: Vec<F> + Debug,
+        SF: Strategy<Value = F> + Clone,
+        SV: Strategy<Value = V> + Clone,
+        C: Fn(&V, &V) -> bool + Clone,
+    {
+        proptest!(
+            |(a in strategy_f, v in strategy_v)| {
+                let r = v.scalar_mul(a.clone()).scalar_div(a);
+                prop_assert!(
+                    approx_eq(&r, &v),
+                    "Expected v * a / a ≈ v, but got:\n\
+                    v         = {:?}\n\
+                    v * a / a = {:?}\n",
+                    v, r
+                );
+            }
+        )
+    }
+
+    /// Property test checking the vector axioms.
+    pub fn prop_vec<F, V, SF, SV, C>(
+        strategy_f: SF,
+        strategy_v: SV,
+        approx_eq: C,
+    ) where
+        F: Field + Debug,
+        V: Vec<F> + Debug,
+        SF: Strategy<Value = F> + Clone,
+        SV: Strategy<Value = V> + Clone,
+        C: Fn(&V, &V) -> bool + Clone,
+    {
+        prop_addition_associative(strategy_v.clone(), approx_eq.clone());
+        prop_addition_commutative(strategy_v.clone(), approx_eq.clone());
+        prop_additive_identity(strategy_v.clone(), approx_eq.clone(), V::ZERO);
+        prop_additive_inverse(strategy_v.clone(), approx_eq.clone(), V::ZERO);
+        prop_multiplicative_identity(strategy_v.clone(), approx_eq.clone());
+        prop_compatible_scalar_multiplication(
+            strategy_f.clone(),
+            strategy_v.clone(),
+            approx_eq.clone(),
+        );
+        prop_distributivity_wrt_vectors(
+            strategy_f.clone(),
+            strategy_v.clone(),
+            approx_eq.clone(),
+        );
+        prop_distributivity_wrt_field(
+            strategy_f.clone(),
+            strategy_v.clone(),
+            approx_eq.clone(),
+        );
+        prop_scalar_mul_div_inverse(
+            strategy_f.clone(),
+            strategy_v.clone(),
+            approx_eq.clone(),
+        );
     }
 
     fn strategy_vec2d<F, S>(strategy: S) -> BoxedStrategy<Vec2D<F>>
@@ -191,18 +318,24 @@ pub mod tests {
             .boxed()
     }
 
-    fn strategy_vec2d_f32() -> BoxedStrategy<Vec2D<f32>> {
+    fn strategy_f32() -> BoxedStrategy<f32> {
         let max: f32 = 1e5;
         let min: f32 = 1e-2;
-        let field_strategy = prop_oneof![-max..-min, min..max].boxed();
-        strategy_vec2d(field_strategy)
+        prop_oneof![-max..-min, min..max].boxed()
+    }
+
+    fn strategy_f64() -> BoxedStrategy<f64> {
+        let max: f64 = 1e5;
+        let min: f64 = 1e-2;
+        prop_oneof![-max..-min, min..max].boxed()
+    }
+
+    fn strategy_vec2d_f32() -> BoxedStrategy<Vec2D<f32>> {
+        strategy_vec2d(strategy_f32())
     }
 
     fn strategy_vec2d_f64() -> BoxedStrategy<Vec2D<f64>> {
-        let max: f64 = 1e5;
-        let min: f64 = 1e-2;
-        let field_strategy = prop_oneof![-max..-min, min..max].boxed();
-        strategy_vec2d(field_strategy)
+        strategy_vec2d(strategy_f64())
     }
 
     fn approxeq_vec2d_f32(a: &Vec2D<f32>, b: &Vec2D<f32>) -> bool {
@@ -259,23 +392,27 @@ pub mod tests {
             && approx_eq_f64_absrel(abstol, reltol)(&a.z, &b.z)
     }
 
+    /// Test that a Vec2D<f32> is a valid vector.
     #[test]
     fn test_vec2d_f32() {
-        prop_vec(strategy_vec2d_f32(), approxeq_vec2d_f32);
+        prop_vec(strategy_f32(), strategy_vec2d_f32(), approxeq_vec2d_f32);
     }
 
+    /// Test that a Vec2D<f64> is a valid vector.
     #[test]
     fn test_vec2d_f64() {
-        prop_vec(strategy_vec2d_f64(), approxeq_vec2d_f64);
+        prop_vec(strategy_f64(), strategy_vec2d_f64(), approxeq_vec2d_f64);
     }
 
+    /// Test that a Vec3D<f32> is a valid vector.
     #[test]
     fn test_vec3d_f32() {
-        prop_vec(strategy_vec3d_f32(), approxeq_vec3d_f32);
+        prop_vec(strategy_f32(), strategy_vec3d_f32(), approxeq_vec3d_f32);
     }
 
+    /// Test that a Vec3D<f64> is a valid vector.
     #[test]
     fn test_vec3d_f64() {
-        prop_vec(strategy_vec3d_f64(), approxeq_vec3d_f64);
+        prop_vec(strategy_f64(), strategy_vec3d_f64(), approxeq_vec3d_f64);
     }
 }
