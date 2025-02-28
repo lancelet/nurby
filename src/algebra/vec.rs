@@ -26,6 +26,47 @@ pub trait VectorSpace<F: Field>:
     fn elements(&self) -> Vec<F>;
 }
 
+/// Defines a projective embedding for a vector space.
+///
+/// This trait allows a vector space to be embedded into a higher-dimensional
+/// homogeneous space, provided that such an embedding is well-defined.
+///
+/// It is separate from [VectorSpace] because not all vector spaces support
+/// projective embeddings.
+pub trait ProjectiveEmbedding<F: Field, V: VectorSpace<F>> {
+    /// The homogeneous representation of this vector space.
+    ///
+    /// This type should correspond to a vector space with one additional
+    /// dimension. For example, for [Vec2D], `Homogeneous` should be [Vec3D].
+    type Homogeneous: VectorSpace<F>;
+
+    /// Converts a vector into its homogeneous form by appending a weight.
+    ///
+    /// This function maps a vector from its current space into the homogeneous
+    /// space by adding a weight component.
+    ///
+    /// # Parameters
+    /// - `v`: The vector to embed.
+    /// - `w`: The weight to append.
+    ///
+    /// # Returns
+    /// A homogeneous vector with the additional dimension.
+    fn embed(v: &V, w: &F) -> Self::Homogeneous;
+
+    /// Converts a homogeneous vector back to the original vector space.
+    ///
+    /// This function performs a perspective division / dehomogenization by the
+    /// homogeneous coordinate (if applicable) to return the vector in its
+    /// original space.
+    ///
+    /// # Parameters
+    /// - `h`: The homogeneous vector to project.
+    ///
+    /// # Returns
+    /// The original vector in the lower-dimensional space.
+    fn project(h: &Self::Homogeneous) -> V;
+}
+
 /// 2D vector.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Vec2D<F: Field> {
@@ -94,6 +135,16 @@ impl<F: Field> DivAssign<F> for Vec2D<F> {
 impl<F: Field> Display for Vec2D<F> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "({}, {})", self.x, self.y)
+    }
+}
+impl<F: Field> ProjectiveEmbedding<F, Vec2D<F>> for Vec2D<F> {
+    type Homogeneous = Vec3D<F>;
+    fn embed(v: &Vec2D<F>, w: &F) -> Self::Homogeneous {
+        Vec3D::new(v.x.clone(), v.y.clone(), w.clone())
+    }
+    fn project(h: &Self::Homogeneous) -> Vec2D<F> {
+        let w = h.z.clone();
+        Vec2D::new(h.x.clone() / w.clone(), h.y.clone() / w.clone())
     }
 }
 impl<F: Field> VectorSpace<F> for Vec2D<F> {
@@ -181,6 +232,20 @@ impl<F: Field> Display for Vec3D<F> {
         write!(f, "({}, {}, {})", self.x, self.y, self.z)
     }
 }
+impl<F: Field> ProjectiveEmbedding<F, Vec3D<F>> for Vec3D<F> {
+    type Homogeneous = Vec4D<F>;
+    fn embed(v: &Vec3D<F>, w: &F) -> Self::Homogeneous {
+        Vec4D::new(v.x.clone(), v.y.clone(), v.z.clone(), w.clone())
+    }
+    fn project(h: &Self::Homogeneous) -> Vec3D<F> {
+        let w = h.w.clone();
+        Vec3D::new(
+            h.x.clone() / w.clone(),
+            h.y.clone() / w.clone(),
+            h.z.clone() / w.clone(),
+        )
+    }
+}
 impl<F: Field> VectorSpace<F> for Vec3D<F> {
     const ZERO: Self = Self {
         x: F::ZERO,
@@ -189,6 +254,123 @@ impl<F: Field> VectorSpace<F> for Vec3D<F> {
     };
     fn elements(&self) -> Vec<F> {
         vec![self.x.clone(), self.y.clone(), self.z.clone()]
+    }
+}
+
+/// 4D vector.
+#[derive(Debug, Clone, PartialEq)]
+pub struct Vec4D<F: Field> {
+    x: F,
+    y: F,
+    z: F,
+    w: F,
+}
+impl<F: Field> Vec4D<F> {
+    pub fn new(x: F, y: F, z: F, w: F) -> Self {
+        Vec4D { x, y, z, w }
+    }
+}
+impl<F: Field> Add for Vec4D<F> {
+    type Output = Self;
+    fn add(self, rhs: Self) -> Self::Output {
+        Vec4D::new(
+            self.x + rhs.x,
+            self.y + rhs.y,
+            self.z + rhs.z,
+            self.w + rhs.w,
+        )
+    }
+}
+impl<F: Field> Sub for Vec4D<F> {
+    type Output = Self;
+    fn sub(self, rhs: Self) -> Self::Output {
+        Vec4D::new(
+            self.x - rhs.x,
+            self.y - rhs.y,
+            self.z - rhs.z,
+            self.w - rhs.w,
+        )
+    }
+}
+impl<F: Field> AddAssign for Vec4D<F> {
+    fn add_assign(&mut self, rhs: Self) {
+        self.x += rhs.x;
+        self.y += rhs.y;
+        self.z += rhs.z;
+        self.w += rhs.w;
+    }
+}
+impl<F: Field> SubAssign for Vec4D<F> {
+    fn sub_assign(&mut self, rhs: Self) {
+        self.x -= rhs.x;
+        self.y -= rhs.y;
+        self.z -= rhs.z;
+        self.w -= rhs.w;
+    }
+}
+impl<F: Field> Mul<F> for Vec4D<F> {
+    type Output = Vec4D<F>;
+    fn mul(self, rhs: F) -> Self::Output {
+        Vec4D::new(
+            self.x * rhs.clone(),
+            self.y * rhs.clone(),
+            self.z * rhs.clone(),
+            self.w * rhs,
+        )
+    }
+}
+impl<F: Field> Div<F> for Vec4D<F> {
+    type Output = Vec4D<F>;
+    fn div(self, rhs: F) -> Self::Output {
+        Vec4D::new(
+            self.x / rhs.clone(),
+            self.y / rhs.clone(),
+            self.z / rhs.clone(),
+            self.w / rhs,
+        )
+    }
+}
+impl<F: Field> Neg for Vec4D<F> {
+    type Output = Self;
+    fn neg(self) -> Self::Output {
+        Vec4D::new(-self.x, -self.y, -self.z, -self.w)
+    }
+}
+impl<F: Field> MulAssign<F> for Vec4D<F> {
+    fn mul_assign(&mut self, rhs: F) {
+        self.x *= rhs.clone();
+        self.y *= rhs.clone();
+        self.z *= rhs.clone();
+        self.w *= rhs;
+    }
+}
+impl<F: Field> DivAssign<F> for Vec4D<F> {
+    fn div_assign(&mut self, rhs: F) {
+        self.x /= rhs.clone();
+        self.y /= rhs.clone();
+        self.z /= rhs.clone();
+        self.w /= rhs;
+    }
+}
+impl<F: Field> Display for Vec4D<F> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "({}, {}, {}, {})", self.x, self.y, self.z, self.w)
+    }
+}
+impl<F: Field> VectorSpace<F> for Vec4D<F> {
+    const ZERO: Self = Self {
+        x: F::ZERO,
+        y: F::ZERO,
+        z: F::ZERO,
+        w: F::ZERO,
+    };
+    fn elements(&self) -> Vec<F> {
+        vec![
+            self.x.clone(),
+            self.y.clone(),
+            self.z.clone(),
+            self.w.clone(),
+        ]
     }
 }
 
@@ -227,6 +409,21 @@ pub mod tests {
     {
         (strategy_f.clone(), strategy_f.clone(), strategy_f.clone())
             .prop_map(|(x, y, z)| Vec3D::new(x, y, z))
+            .boxed()
+    }
+
+    pub fn strategy_vec4d<F, SF>(strategy_f: &SF) -> BoxedStrategy<Vec4D<F>>
+    where
+        F: Field,
+        SF: Strategy<Value = F> + Clone + 'static,
+    {
+        (
+            strategy_f.clone(),
+            strategy_f.clone(),
+            strategy_f.clone(),
+            strategy_f.clone(),
+        )
+            .prop_map(|(x, y, z, w)| Vec4D::new(x, y, z, w))
             .boxed()
     }
 
@@ -372,6 +569,17 @@ pub mod tests {
         let strategy_f = strategy_qrational_i32s();
         let strategy_v = strategy_vec3d(&strategy_f);
         let approx_eq = |a: &Vec3D<QRational>, b: &Vec3D<QRational>| {
+            elementwise_approx_eq(a, b, QRational::eq)
+        };
+
+        prop_vector_space_axioms(strategy_f, strategy_v, approx_eq, 256);
+    }
+
+    #[test]
+    pub fn test_vec4d_qrational_vector_space_axioms() {
+        let strategy_f = strategy_qrational_i32s();
+        let strategy_v = strategy_vec4d(&strategy_f);
+        let approx_eq = |a: &Vec4D<QRational>, b: &Vec4D<QRational>| {
             elementwise_approx_eq(a, b, QRational::eq)
         };
 
