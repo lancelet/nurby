@@ -1,4 +1,4 @@
-use core::fmt::Debug;
+use core::fmt::{Debug, Display};
 use core::ops::{
     Add, AddAssign, Div, DivAssign, Mul, MulAssign, Neg, Sub, SubAssign,
 };
@@ -7,16 +7,19 @@ use core::ops::{
 ///
 /// See: <https://en.wikipedia.org/wiki/Field_(mathematics)>
 ///
-/// A field is the underlying continuous representation type used as the
-/// basis for  NURBS curves and surfaces. Examples of a field include:
-///
+/// A `Field` represents the scalar values that NURBS curves and surfaces
+/// are computed on. Examples of a field include:
 /// - `f32` (approximate)
 /// - `f64` (approximate)
 /// - [`QRational`][crate::algebra::QRational] (exact if it fits in memory)
+///
+/// Not all NURBS operations are possible on `Field`s, but they form the
+/// initial representation.
 pub trait Field:
     Sized
     + Debug
     + Clone
+    + Display
     + PartialEq
     + Add<Self, Output = Self>
     + Sub<Self, Output = Self>

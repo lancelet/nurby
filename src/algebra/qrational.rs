@@ -1,9 +1,10 @@
 use crate::algebra::Field;
+use core::fmt::{Display, Formatter, Result};
 use core::ops::{
     Add, AddAssign, Div, DivAssign, Mul, MulAssign, Neg, Sub, SubAssign,
 };
 use malachite::{
-    base::num::basic::traits::Zero,
+    base::num::arithmetic::traits::Abs, base::num::basic::traits::Zero,
     base::num::conversion::traits::RoundingFrom,
     base::rounding_modes::RoundingMode, rational::Rational,
 };
@@ -157,6 +158,25 @@ impl DivAssign for QRational {
         *self = self.clone() / rhs;
     }
 }
+impl Display for QRational {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result {
+        if self.r == 0 && self.q == 0 {
+            write!(f, "0")
+        } else if self.q == 0 {
+            write!(f, "{}", self.r)
+        } else if self.r == 0 {
+            let q_abs = self.q.clone().abs();
+            let q_sign = if self.q > 0 { "" } else { "-" };
+            let q_str = if q_abs == 1 { "" } else { &q_abs.to_string() };
+            write!(f, "{}{}√2", q_sign, q_str)
+        } else {
+            let q_abs = self.q.clone().abs();
+            let q_sign = if self.q > 0 { "+" } else { "-" };
+            let q_str = if q_abs == 1 { "" } else { &q_abs.to_string() };
+            write!(f, "({} {} {}√2)", self.r, q_sign, q_str)
+        }
+    }
+}
 impl Field for QRational {
     const ZERO: Self = QRational {
         r: Rational::const_from_unsigned(0),
@@ -192,7 +212,7 @@ impl_from_integer!(
 );
 
 #[cfg(test)]
-mod tests {
+pub mod tests {
     use super::*;
     use crate::algebra::field::tests::{approx_eq_f64_inf, prop_field_axioms};
     use proptest::prelude::*;
@@ -218,8 +238,33 @@ mod tests {
         assert_eq!(6.0f64, a);
     }
 
+    #[test]
+    fn example_04() {
+        let a = QRational::from(42);
+        let b = QRational::SQRT2;
+        let c = QRational::SQRT2 * QRational::from(-1);
+        let d = QRational::from(0);
+        let e = QRational::from(42) + QRational::from(5) * QRational::SQRT2;
+        let f = QRational::from(42) - QRational::from(5) * QRational::SQRT2;
+        let g = -QRational::from(42);
+        let h = QRational::from(5) / QRational::from(6);
+        let i = -QRational::from(5) / QRational::from(6)
+            - QRational::from(7) / QRational::from(8) * QRational::SQRT2;
+        let j = QRational::from(1) / QRational::SQRT2;
+        assert_eq!("42", a.to_string());
+        assert_eq!("√2", b.to_string());
+        assert_eq!("-√2", c.to_string());
+        assert_eq!("0", d.to_string());
+        assert_eq!("(42 + 5√2)", e.to_string());
+        assert_eq!("(42 - 5√2)", f.to_string());
+        assert_eq!("-42", g.to_string());
+        assert_eq!("5/6", h.to_string());
+        assert_eq!("(-5/6 - 7/8√2)", i.to_string());
+        assert_eq!("1/2√2", j.to_string());
+    }
+
     /// Strategy to generate a `QRational` from `i32` values.
-    fn strategy_qrational_i32s() -> BoxedStrategy<QRational> {
+    pub fn strategy_qrational_i32s() -> BoxedStrategy<QRational> {
         let s = any::<i32>();
         (s.clone(), s.clone(), s.clone(), s.clone())
             .prop_map(|(rn, rd, qn, qd)| {
