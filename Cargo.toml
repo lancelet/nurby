@@ -4,9 +4,16 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-algebraics = "0.3.0"
-num-rational = "0.4.2"
-num-traits = "0.2.19"
+malachite = "0.5.0"
 
 [dev-dependencies]
 proptest = "1.6.0"
+
+[package.metadata.docs.rs]
+features = ["default"]
+rustdoc-args = [
+    "--cfg",
+    "docsrs",
+    "--html-in-header",
+    "mathjax-doc-header.html",
+]
