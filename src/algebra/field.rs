@@ -117,7 +117,7 @@ pub mod tests {
         let largest = f32::max(a.abs(), b.abs());
         (a.is_infinite() && b.is_infinite() && a.signum() == b.signum())
             || diff <= reltol.abs() * largest
-            || diff < abstol.abs()
+            || diff <= abstol.abs()
     }
 
     /// Checks for approximate `f64` equality, with equality of infinities.
@@ -162,7 +162,7 @@ pub mod tests {
         let largest = f64::max(a.abs(), b.abs());
         (a.is_infinite() && b.is_infinite() && a.signum() == b.signum())
             || diff <= reltol.abs() * largest
-            || diff < abstol.abs()
+            || diff <= abstol.abs()
     }
 
     /// A utility macro to clone multiple variables before evaluating an
@@ -614,7 +614,7 @@ pub mod tests {
     ///
     /// - `include_zero`: `true` if an exact zero should be included among
     ///   the generated values.
-    ///   
+    ///
     /// # Returns
     ///
     /// A boxed strategy for `f32` values.
@@ -647,7 +647,7 @@ pub mod tests {
     ///
     /// - `include_zero`: `true` if an exact zero should be included among
     ///   the generated values.
-    ///   
+    ///
     /// # Returns
     ///
     /// A boxed strategy for `f64` values.

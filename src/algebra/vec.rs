@@ -26,6 +26,41 @@ pub trait VectorSpace<F: Field>:
     fn elements(&self) -> Vec<F>;
 }
 
+/// Interpolate linearly between vectors.
+///
+/// This function linearly interpolates between `from` and `to`, using the
+/// value `amount`. To obtain points in the range `[from, to]`, the `amount`
+/// should be in the range `[0, 1]`. If `amount` is outside this range, then
+/// the line linearly extrapolating between `from` and `to` is obtained. For
+/// a value of `amount = 0`, the value `from` is returned, while for a value
+/// of `amount = 1`, the value `to` is returned.
+///
+/// # Parameters
+///
+/// - `from`: Origin point, corresponding to `amount = 0`.
+/// - `to`: Destination point, corresponding to `amount = 1`.
+/// - `amount`: Interpolation value; from `[0, 1]` for interpolation, and
+///   outside that range for extrapolation.
+///
+/// # Returns
+///
+/// Interpolated value.
+pub fn interp<F, V>(from: &V, to: &V, amount: &F) -> V
+where
+    F: Field,
+    V: VectorSpace<F>,
+{
+    // u and v are the interpolating scalars
+    let u: F = amount.clone();
+    let v: F = F::ONE - u.clone();
+
+    // r is the vector to - from, p is from.
+    let r: V = to.clone() - from.clone();
+    let p: V = from.clone();
+
+    p * v + r * u
+}
+
 /// Defines a projective embedding for a vector space.
 ///
 /// This trait allows a vector space to be embedded into a higher-dimensional

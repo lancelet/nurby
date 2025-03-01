@@ -103,12 +103,6 @@ impl Add for QRational {
         QRational::new(self.r + rhs.r, self.q + rhs.q)
     }
 }
-impl<'a> Add<&'a Self> for QRational {
-    type Output = Self;
-    fn add(self, rhs: &'a Self) -> Self::Output {
-        self + rhs.clone()
-    }
-}
 impl Sub for QRational {
     type Output = Self;
     fn sub(self, rhs: Self) -> Self::Output {
