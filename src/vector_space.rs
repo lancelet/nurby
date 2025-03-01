@@ -1100,4 +1100,18 @@ pub mod tests {
             Vec4D::new(2.2f64, 4.2f64, 6.2f64, 8.2f64).to_string()
         );
     }
+
+    #[test]
+    pub fn test_interp_example() {
+        let p0 = Vec2D::new(1f32, 2f32);
+        let p1 = Vec2D::new(3f32, 5f32);
+
+        // end points
+        assert_eq!(p0, interp(p0, p1, 0.0));
+        assert_eq!(p1, interp(p0, p1, 1.0));
+        // mid point
+        assert_eq!(Vec2D::new(2f32, 3.5f32), interp(p0, p1, 0.5));
+        // extrapolation
+        assert_eq!(Vec2D::new(5f32, 8f32), interp(p0, p1, 2.0));
+    }
 }
