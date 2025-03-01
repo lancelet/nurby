@@ -90,10 +90,10 @@ where
 
     /// Returns the vector component of the homogeneous coordinate, WITHOUT
     /// normalizing (ie. no division by the weight).
-    fn get_vector(h: &Self::Homogeneous) -> V;
+    fn get_vector_from_homogeneous(h: &Self::Homogeneous) -> V;
 
     /// Returns the weight component of the homogeneous coordinate.
-    fn get_weight(h: &Self::Homogeneous) -> F;
+    fn get_weight_from_homogeneous(h: &Self::Homogeneous) -> F;
 
     /// Converts a homogeneous vector back to the original vector space.
     ///
@@ -227,10 +227,10 @@ where
         let w = h.z;
         Vec2D::new(h.x / w, h.y / w)
     }
-    fn get_vector(h: &Self::Homogeneous) -> Vec2D<F> {
+    fn get_vector_from_homogeneous(h: &Self::Homogeneous) -> Vec2D<F> {
         Vec2D::new(h.x, h.y)
     }
-    fn get_weight(h: &Self::Homogeneous) -> F {
+    fn get_weight_from_homogeneous(h: &Self::Homogeneous) -> F {
         h.z
     }
 }
@@ -369,10 +369,10 @@ where
     fn project(h: Self::Homogeneous) -> Vec3D<F> {
         Vec3D::new(h.x / h.w, h.y / h.w, h.z / h.w)
     }
-    fn get_vector(h: &Self::Homogeneous) -> Vec3D<F> {
+    fn get_vector_from_homogeneous(h: &Self::Homogeneous) -> Vec3D<F> {
         Vec3D::new(h.x, h.y, h.z)
     }
-    fn get_weight(h: &Self::Homogeneous) -> F {
+    fn get_weight_from_homogeneous(h: &Self::Homogeneous) -> F {
         h.w
     }
 }
@@ -739,8 +739,8 @@ pub mod tests {
         assert_eq!(expected_h_elements, h.elements());
 
         // Check that get_vector and get_weight return correct values.
-        assert_eq!(x, V::get_vector(&h));
-        assert_eq!(w, V::get_weight(&h));
+        assert_eq!(x, V::get_vector_from_homogeneous(&h));
+        assert_eq!(w, V::get_weight_from_homogeneous(&h));
 
         // Project / de-homogenise from the projective space.
         if !w.is_zero() {

@@ -65,12 +65,12 @@ where
 
     /// Returns the location of the `ControlPoint`.
     pub fn location(&self) -> V {
-        V::get_vector(&self.homogeneous)
+        V::get_vector_from_homogeneous(&self.homogeneous)
     }
 
     /// Returns the weight of the `ControlPoint`.
     pub fn weight(&self) -> F {
-        V::get_weight(&self.homogeneous)
+        V::get_weight_from_homogeneous(&self.homogeneous)
     }
 
     /// Return the homogeneous coordinate of the `ControlPoint`.
