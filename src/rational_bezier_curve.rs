@@ -1,20 +1,19 @@
-use crate::{
-    ControlPoint,
-    algebra::{OrderedField, ProjectiveEmbedding, VectorSpace, clamp, interp},
-};
+use crate::{ControlPoint, ProjectiveEmbedding, VectorSpace, interp};
+use core::fmt::{Debug, Display};
+use num_traits::Float;
 
 /// Rational Bézier curve.
 pub struct RationalBezierCurve<F, V>
 where
-    F: OrderedField,
-    V: VectorSpace<F>,
+    F: Float + Debug + Display,
+    V: VectorSpace<F> + ProjectiveEmbedding<F, V>,
 {
     control_points: Vec<ControlPoint<F, V>>,
 }
 impl<F, V> RationalBezierCurve<F, V>
 where
-    F: OrderedField,
-    V: VectorSpace<F>,
+    F: Float + Debug + Display,
+    V: VectorSpace<F> + ProjectiveEmbedding<F, V>,
 {
     /// Creates a new `RationalBezierCurve`.
     ///
@@ -45,35 +44,30 @@ where
     ///
     /// # Parameters
     ///
-    /// - `u`: The parameter value. This is clamped to the range
-    ///   $0 \leq u \leq 1$.
+    /// - `u`: The parameter value. For points inside the curve, this should
+    ///   be in the range `[0, 1]`, but values outside that range can be used
+    ///   for extrapolation.
     ///
     /// # Returns
     ///
     /// The vector value which results from evaluating the curve at `u`.
-    pub fn decasteljau_eval<E>(&self, u: &F) -> V
-    where
-        E: ProjectiveEmbedding<F, V>,
-    {
-        // Clamp the input to the range `[0, 1]`.
-        let u = clamp(&F::ZERO, &F::ONE, &u);
-
+    pub fn decasteljau_eval(&self, u: F) -> V {
         // Clone control points in homogeneous form.
-        let mut pts: Vec<E::Homogeneous> = self
+        let mut pts: Vec<V::Homogeneous> = self
             .control_points
             .iter()
-            .map(|p| p.to_homogeneous::<E>())
+            .map(|p| p.to_homogeneous())
             .collect();
 
         // Perform deCasteljau evaluation.
         for j in (0..self.degree()).rev() {
             for i in 0..j {
-                pts[i] = interp(&pts[i], &pts[i + 1], &u);
+                pts[i] = interp(pts[i], pts[i + 1], u);
             }
         }
 
         // Project final point.
-        E::project(&pts[0])
+        V::project(pts[0])
     }
 }
 

@@ -1,12 +1,22 @@
-use crate::algebra::{Field, ProjectiveEmbedding, Vec2D, Vec3D, VectorSpace};
+use crate::{ProjectiveEmbedding, Vec2D, Vec3D, VectorSpace};
+use core::fmt::{Debug, Display};
+use num_traits::Float;
 
 /// Rational control point.
 #[derive(Debug, Clone)]
-pub struct ControlPoint<F: Field, V: VectorSpace<F>> {
+pub struct ControlPoint<F, V>
+where
+    F: Float + Debug + Display,
+    V: VectorSpace<F> + ProjectiveEmbedding<F, V>,
+{
     location: V,
     weight: F,
 }
-impl<F: Field, V: VectorSpace<F>> ControlPoint<F, V> {
+impl<F, V> ControlPoint<F, V>
+where
+    F: Float + Debug + Display,
+    V: VectorSpace<F> + ProjectiveEmbedding<F, V>,
+{
     /// Creates a new `ControlPoint`.
     ///
     /// # Parameters
@@ -67,10 +77,7 @@ impl<F: Field, V: VectorSpace<F>> ControlPoint<F, V> {
     ///
     /// This uses a projective embedding, which is a trait that associates the
     /// correct vector spaces with each other.
-    pub fn to_homogeneous<E>(&self) -> E::Homogeneous
-    where
-        E: ProjectiveEmbedding<F, V>,
-    {
-        E::embed(&self.location, &self.weight)
+    pub fn to_homogeneous(&self) -> V::Homogeneous {
+        V::embed(self.location, self.weight)
     }
 }
