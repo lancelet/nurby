@@ -39,6 +39,20 @@ where
         self.control_points.len() - 1
     }
 
+    /// Returns an iterator over the control points of the curve as
+    /// homogeneous vectors.
+    pub fn homogeneous_control_points_iter(
+        &self,
+    ) -> impl Iterator<Item = &V::Homogeneous> {
+        self.control_points.iter().map(ControlPoint::homogeneous)
+    }
+
+    /// Returns a vector of the control points of the curve as homogeneous
+    /// vectors.
+    pub fn homogeneous_control_points(&self) -> Vec<V::Homogeneous> {
+        self.homogeneous_control_points_iter().copied().collect()
+    }
+
     /// Evaluates the curve at a parameter value using the de Casteljau
     /// recursive algorithm.
     ///
@@ -52,14 +66,11 @@ where
     ///
     /// The vector value which results from evaluating the curve at `u`.
     pub fn decasteljau_eval(&self, u: F) -> V {
-        // Clone control points in homogeneous form.
-        let mut pts: Vec<V::Homogeneous> = self
-            .control_points
-            .iter()
-            .map(|p| p.to_homogeneous())
-            .collect();
+        // Copy control points in homogeneous form.
+        let mut pts: Vec<V::Homogeneous> = self.homogeneous_control_points();
 
-        // Perform deCasteljau evaluation.
+        // Perform deCasteljau recursive evaluation. This version is expressed
+        // non-recursively.
         for j in (0..self.degree()).rev() {
             for i in 0..j {
                 pts[i] = interp(pts[i], pts[i + 1], u);

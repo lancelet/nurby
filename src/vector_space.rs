@@ -59,7 +59,8 @@ where
 /// Defines a projective embedding for a vector space.
 ///
 /// This trait allows a vector space to be embedded into a higher-dimensional
-/// homogeneous space, provided that such an embedding is well-defined.
+/// homogeneous space, provided that such an embedding exists for the types
+/// available.
 ///
 /// It is separate from [VectorSpace] because not all vector spaces support
 /// projective embeddings.
@@ -86,6 +87,13 @@ where
     /// # Returns
     /// A homogeneous vector with the additional dimension.
     fn embed(v: V, w: F) -> Self::Homogeneous;
+
+    /// Returns the vector component of the homogeneous coordinate, WITHOUT
+    /// normalizing (ie. no division by the weight).
+    fn get_vector(h: &Self::Homogeneous) -> V;
+
+    /// Returns the weight component of the homogeneous coordinate.
+    fn get_weight(h: &Self::Homogeneous) -> F;
 
     /// Converts a homogeneous vector back to the original vector space.
     ///
@@ -218,6 +226,12 @@ where
     fn project(h: Self::Homogeneous) -> Vec2D<F> {
         let w = h.z;
         Vec2D::new(h.x / w, h.y / w)
+    }
+    fn get_vector(h: &Self::Homogeneous) -> Vec2D<F> {
+        Vec2D::new(h.x, h.y)
+    }
+    fn get_weight(h: &Self::Homogeneous) -> F {
+        h.z
     }
 }
 impl<F> VectorSpace<F> for Vec2D<F>
@@ -354,6 +368,12 @@ where
     }
     fn project(h: Self::Homogeneous) -> Vec3D<F> {
         Vec3D::new(h.x / h.w, h.y / h.w, h.z / h.w)
+    }
+    fn get_vector(h: &Self::Homogeneous) -> Vec3D<F> {
+        Vec3D::new(h.x, h.y, h.z)
+    }
+    fn get_weight(h: &Self::Homogeneous) -> F {
+        h.w
     }
 }
 impl<F> VectorSpace<F> for Vec3D<F>
@@ -708,7 +728,7 @@ pub mod tests {
     pub fn check_projective_embedding<F, V, C>(x: V, w: F, eq: C)
     where
         F: Float + Debug + Display,
-        V: VectorSpace<F> + ProjectiveEmbedding<F, V>,
+        V: VectorSpace<F> + ProjectiveEmbedding<F, V> + PartialEq,
         C: Fn(V, V) -> bool,
     {
         // Construct the embedding into the projective / homogeneous space and
@@ -717,6 +737,10 @@ pub mod tests {
         let mut expected_h_elements = x.elements();
         expected_h_elements.push(w);
         assert_eq!(expected_h_elements, h.elements());
+
+        // Check that get_vector and get_weight return correct values.
+        assert_eq!(x, V::get_vector(&h));
+        assert_eq!(w, V::get_weight(&h));
 
         // Project / de-homogenise from the projective space.
         if !w.is_zero() {
@@ -731,7 +755,7 @@ pub mod tests {
         n_cases: u32,
     ) where
         F: Float + Debug + Display,
-        V: VectorSpace<F> + ProjectiveEmbedding<F, V>,
+        V: VectorSpace<F> + ProjectiveEmbedding<F, V> + PartialEq,
         SF: Strategy<Value = F> + Clone,
         SV: Strategy<Value = V> + Clone,
         C: Fn(V, V) -> bool + Clone,

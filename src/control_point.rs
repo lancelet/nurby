@@ -9,8 +9,7 @@ where
     F: Float + Debug + Display,
     V: VectorSpace<F> + ProjectiveEmbedding<F, V>,
 {
-    location: V,
-    weight: F,
+    homogeneous: V::Homogeneous,
 }
 impl<F, V> ControlPoint<F, V>
 where
@@ -28,7 +27,9 @@ where
     ///
     /// A new `ControlPoint`.
     pub fn new(location: V, weight: F) -> Self {
-        Self { location, weight }
+        Self {
+            homogeneous: V::embed(location, weight),
+        }
     }
 
     /// Creates a `ControlPoint` in 2D Cartesian space.
@@ -63,21 +64,17 @@ where
     }
 
     /// Returns the location of the `ControlPoint`.
-    pub fn location(&self) -> &V {
-        &self.location
+    pub fn location(&self) -> V {
+        V::get_vector(&self.homogeneous)
     }
 
     /// Returns the weight of the `ControlPoint`.
-    pub fn weight(&self) -> &F {
-        &self.weight
+    pub fn weight(&self) -> F {
+        V::get_weight(&self.homogeneous)
     }
 
-    /// Returns a homogeneous vector containing the control point coordinates
-    /// and its weight.
-    ///
-    /// This uses a projective embedding, which is a trait that associates the
-    /// correct vector spaces with each other.
-    pub fn to_homogeneous(&self) -> V::Homogeneous {
-        V::embed(self.location, self.weight)
+    /// Return the homogeneous coordinate of the `ControlPoint`.
+    pub fn homogeneous(&self) -> &V::Homogeneous {
+        &self.homogeneous
     }
 }
