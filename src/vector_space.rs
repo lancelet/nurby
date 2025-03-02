@@ -1,18 +1,17 @@
+use crate::Float;
 use core::fmt::{Debug, Display};
 use core::ops::{
     Add, AddAssign, Div, DivAssign, Mul, MulAssign, Neg, Sub, SubAssign,
 };
-use num_traits::Float;
 
 /// Vector space.
 ///
 /// See: <https://en.wikipedia.org/wiki/Vector_space>
-pub trait VectorSpace<F>:
+pub trait VectorSpace<F: Float>:
     Sized
     + Debug
     + Display
     + Copy
-    + Clone
     + Add<Self, Output = Self>
     + Sub<Self, Output = Self>
     + Mul<F, Output = Self>
@@ -22,11 +21,9 @@ pub trait VectorSpace<F>:
     + SubAssign
     + MulAssign<F>
     + DivAssign<F>
-where
-    F: Float + Debug + Display,
 {
     fn zero() -> Self;
-    fn elements(&self) -> Vec<F>;
+    fn elements(&self) -> impl Iterator<Item = F>;
 }
 
 /// Interpolate linearly between vectors.
@@ -50,7 +47,7 @@ where
 /// Interpolated value.
 pub fn interp<F, V>(p0: V, p1: V, u: F) -> V
 where
-    F: Float + Debug + Display,
+    F: Float,
     V: VectorSpace<F>,
 {
     p0 * (F::one() - u) + p1 * u
@@ -91,7 +88,7 @@ where
 /// support projective embeddings required for rational splines.
 pub trait ProjectiveEmbedding<F, V>
 where
-    F: Float + Debug + Display,
+    F: Float,
     V: VectorSpace<F>,
 {
     /// The homogeneous representation of this vector space.
@@ -137,120 +134,80 @@ where
 
 /// 2D vector.
 #[derive(Debug, Clone, Copy, PartialEq)]
-pub struct Vec2D<F>
-where
-    F: Float + Debug + Display,
-{
+pub struct Vec2D<F: Float> {
     x: F,
     y: F,
 }
-impl<F> Vec2D<F>
-where
-    F: Float + Debug + Display,
-{
+impl<F: Float> Vec2D<F> {
     pub fn new(x: F, y: F) -> Self {
         Vec2D { x, y }
     }
 }
-impl<F> Add for Vec2D<F>
-where
-    F: Float + Debug + Display,
-{
+impl<F: Float> Add for Vec2D<F> {
     type Output = Self;
     fn add(self, rhs: Self) -> Self::Output {
         Vec2D::new(self.x + rhs.x, self.y + rhs.y)
     }
 }
-impl<F> Sub for Vec2D<F>
-where
-    F: Float + Debug + Display,
-{
+impl<F: Float> Sub for Vec2D<F> {
     type Output = Self;
     fn sub(self, rhs: Self) -> Self::Output {
         Vec2D::new(self.x - rhs.x, self.y - rhs.y)
     }
 }
-impl<F> Mul<F> for Vec2D<F>
-where
-    F: Float + Debug + Display,
-{
+impl<F: Float> Mul<F> for Vec2D<F> {
     type Output = Vec2D<F>;
     fn mul(self, rhs: F) -> Self::Output {
         Vec2D::new(self.x * rhs, self.y * rhs)
     }
 }
-impl<F> Div<F> for Vec2D<F>
-where
-    F: Float + Debug + Display,
-{
+impl<F: Float> Div<F> for Vec2D<F> {
     type Output = Vec2D<F>;
     fn div(self, rhs: F) -> Self::Output {
         Vec2D::new(self.x / rhs, self.y / rhs)
     }
 }
-impl<F> Neg for Vec2D<F>
-where
-    F: Float + Debug + Display,
-{
+impl<F: Float> Neg for Vec2D<F> {
     type Output = Self;
     fn neg(self) -> Self::Output {
         Vec2D::new(-self.x, -self.y)
     }
 }
-impl<F> AddAssign for Vec2D<F>
-where
-    F: Float + Debug + Display,
-{
+impl<F: Float> AddAssign for Vec2D<F> {
     fn add_assign(&mut self, rhs: Self) {
-        self.x = self.x + rhs.x;
-        self.y = self.y + rhs.y;
+        *self = *self + rhs;
     }
 }
-impl<F> SubAssign for Vec2D<F>
-where
-    F: Float + Debug + Display,
-{
+impl<F: Float> SubAssign for Vec2D<F> {
     fn sub_assign(&mut self, rhs: Self) {
-        self.x = self.x - rhs.x;
-        self.y = self.y - rhs.y;
+        *self = *self - rhs;
     }
 }
-impl<F> MulAssign<F> for Vec2D<F>
-where
-    F: Float + Debug + Display,
-{
+impl<F: Float> MulAssign<F> for Vec2D<F> {
     fn mul_assign(&mut self, rhs: F) {
-        self.x = self.x * rhs;
-        self.y = self.y * rhs;
+        *self = *self * rhs;
     }
 }
-impl<F> DivAssign<F> for Vec2D<F>
-where
-    F: Float + Debug + Display,
-{
+impl<F: Float> DivAssign<F> for Vec2D<F> {
     fn div_assign(&mut self, rhs: F) {
-        self.x = self.x / rhs;
-        self.y = self.y / rhs;
+        *self = *self / rhs;
     }
 }
-impl<F> Display for Vec2D<F>
-where
-    F: Float + Debug + Display,
-{
+impl<F: Float> Display for Vec2D<F> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "({}, {})", self.x, self.y)
     }
 }
-impl<F> ProjectiveEmbedding<F, Vec2D<F>> for Vec2D<F>
-where
-    F: Float + Debug + Display,
-{
+impl<F: Float> ProjectiveEmbedding<F, Vec2D<F>> for Vec2D<F> {
     type Homogeneous = Vec3D<F>;
     fn embed(v: Vec2D<F>, w: F) -> Self::Homogeneous {
         Vec3D::new(w * v.x, w * v.y, w)
     }
     fn project(h: Self::Homogeneous) -> Vec2D<F> {
         let w = h.z;
+        if w.is_zero() {
+            panic!("Cannot project a homogeneous vector with zero weight");
+        }
         Vec2D::new(h.x / w, h.y / w)
     }
 
@@ -262,139 +219,92 @@ where
         h.z
     }
 }
-impl<F> VectorSpace<F> for Vec2D<F>
-where
-    F: Float + Debug + Display,
-{
+impl<F: Float> VectorSpace<F> for Vec2D<F> {
     fn zero() -> Self {
         let z = F::zero();
         Self::new(z, z)
     }
-    fn elements(&self) -> Vec<F> {
-        vec![self.x.clone(), self.y.clone()]
+    fn elements(&self) -> impl Iterator<Item = F> {
+        [self.x, self.y].into_iter()
     }
 }
 
 /// 3D vector.
 #[derive(Debug, Clone, Copy, PartialEq)]
-pub struct Vec3D<F>
-where
-    F: Float + Debug + Display,
-{
+pub struct Vec3D<F: Float> {
     x: F,
     y: F,
     z: F,
 }
-impl<F> Vec3D<F>
-where
-    F: Float + Debug + Display,
-{
+impl<F: Float> Vec3D<F> {
     pub fn new(x: F, y: F, z: F) -> Self {
         Vec3D { x, y, z }
     }
 }
-impl<F> Add for Vec3D<F>
-where
-    F: Float + Debug + Display,
-{
+impl<F: Float> Add for Vec3D<F> {
     type Output = Self;
     fn add(self, rhs: Self) -> Self::Output {
         Vec3D::new(self.x + rhs.x, self.y + rhs.y, self.z + rhs.z)
     }
 }
-impl<F: Float> Sub for Vec3D<F>
-where
-    F: Float + Debug + Display,
-{
+impl<F: Float> Sub for Vec3D<F> {
     type Output = Self;
     fn sub(self, rhs: Self) -> Self::Output {
         Vec3D::new(self.x - rhs.x, self.y - rhs.y, self.z - rhs.z)
     }
 }
-impl<F: Float> AddAssign for Vec3D<F>
-where
-    F: Float + Debug + Display,
-{
+impl<F: Float> AddAssign for Vec3D<F> {
     fn add_assign(&mut self, rhs: Self) {
-        self.x = self.x + rhs.x;
-        self.y = self.y + rhs.y;
-        self.z = self.z + rhs.z;
+        *self = *self + rhs;
     }
 }
-impl<F> SubAssign for Vec3D<F>
-where
-    F: Float + Debug + Display,
-{
+impl<F: Float> SubAssign for Vec3D<F> {
     fn sub_assign(&mut self, rhs: Self) {
-        self.x = self.x - rhs.x;
-        self.y = self.y - rhs.y;
-        self.z = self.z - rhs.z;
+        *self = *self - rhs;
     }
 }
-impl<F> Mul<F> for Vec3D<F>
-where
-    F: Float + Debug + Display,
-{
+impl<F: Float> Mul<F> for Vec3D<F> {
     type Output = Vec3D<F>;
     fn mul(self, rhs: F) -> Self::Output {
         Vec3D::new(self.x * rhs, self.y * rhs, self.z * rhs)
     }
 }
-impl<F> Div<F> for Vec3D<F>
-where
-    F: Float + Debug + Display,
-{
+impl<F: Float> Div<F> for Vec3D<F> {
     type Output = Vec3D<F>;
     fn div(self, rhs: F) -> Self::Output {
         Vec3D::new(self.x / rhs, self.y / rhs, self.z / rhs)
     }
 }
-impl<F> Neg for Vec3D<F>
-where
-    F: Float + Debug + Display,
-{
+impl<F: Float> Neg for Vec3D<F> {
     type Output = Self;
     fn neg(self) -> Self::Output {
         Vec3D::new(-self.x, -self.y, -self.z)
     }
 }
-impl<F> MulAssign<F> for Vec3D<F>
-where
-    F: Float + Debug + Display,
-{
+impl<F: Float> MulAssign<F> for Vec3D<F> {
     fn mul_assign(&mut self, rhs: F) {
-        self.x = self.x * rhs;
-        self.y = self.y * rhs;
-        self.z = self.z * rhs;
+        *self = *self * rhs;
     }
 }
-impl<F> DivAssign<F> for Vec3D<F>
-where
-    F: Float + Debug + Display,
-{
+impl<F: Float> DivAssign<F> for Vec3D<F> {
     fn div_assign(&mut self, rhs: F) {
-        self.x = self.x / rhs;
-        self.y = self.y / rhs;
-        self.z = self.z / rhs;
+        *self = *self / rhs;
     }
 }
-impl<F> Display for Vec3D<F>
-where
-    F: Float + Debug + Display,
-{
+impl<F: Float> Display for Vec3D<F> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "({}, {}, {})", self.x, self.y, self.z)
     }
 }
-impl<F> ProjectiveEmbedding<F, Vec3D<F>> for Vec3D<F>
-where
-    F: Float + Debug + Display,
-{
+impl<F: Float> ProjectiveEmbedding<F, Vec3D<F>> for Vec3D<F> {
     type Homogeneous = Vec4D<F>;
     fn embed(v: Vec3D<F>, w: F) -> Self::Homogeneous {
         Vec4D::new(w * v.x, w * v.y, w * v.z, w)
     }
     fn project(h: Self::Homogeneous) -> Vec3D<F> {
+        if h.w.is_zero() {
+            panic!("Cannot project a homogeneous vector with zero weight");
+        }
         Vec3D::new(h.x / h.w, h.y / h.w, h.z / h.w)
     }
     fn weighted_control_point(h: Self::Homogeneous) -> Vec3D<F> {
@@ -404,42 +314,30 @@ where
         h.w
     }
 }
-impl<F> VectorSpace<F> for Vec3D<F>
-where
-    F: Float + Debug + Display,
-{
+impl<F: Float> VectorSpace<F> for Vec3D<F> {
     fn zero() -> Self {
         let z = F::zero();
         Self::new(z, z, z)
     }
-    fn elements(&self) -> Vec<F> {
-        vec![self.x.clone(), self.y.clone(), self.z.clone()]
+    fn elements(&self) -> impl Iterator<Item = F> {
+        [self.x, self.y, self.z].into_iter()
     }
 }
 
 /// 4D vector.
 #[derive(Debug, Clone, Copy, PartialEq)]
-pub struct Vec4D<F>
-where
-    F: Float + Debug + Display,
-{
+pub struct Vec4D<F: Float> {
     x: F,
     y: F,
     z: F,
     w: F,
 }
-impl<F> Vec4D<F>
-where
-    F: Float + Debug + Display,
-{
+impl<F: Float> Vec4D<F> {
     pub fn new(x: F, y: F, z: F, w: F) -> Self {
         Vec4D { x, y, z, w }
     }
 }
-impl<F> Add for Vec4D<F>
-where
-    F: Float + Debug + Display,
-{
+impl<F: Float> Add for Vec4D<F> {
     type Output = Self;
     fn add(self, rhs: Self) -> Self::Output {
         Vec4D::new(
@@ -450,10 +348,7 @@ where
         )
     }
 }
-impl<F> Sub for Vec4D<F>
-where
-    F: Float + Debug + Display,
-{
+impl<F: Float> Sub for Vec4D<F> {
     type Output = Self;
     fn sub(self, rhs: Self) -> Self::Output {
         Vec4D::new(
@@ -464,100 +359,56 @@ where
         )
     }
 }
-impl<F> AddAssign for Vec4D<F>
-where
-    F: Float + Debug + Display,
-{
+impl<F: Float> AddAssign for Vec4D<F> {
     fn add_assign(&mut self, rhs: Self) {
-        self.x = self.x + rhs.x;
-        self.y = self.y + rhs.y;
-        self.z = self.z + rhs.z;
-        self.w = self.w + rhs.w;
+        *self = *self + rhs;
     }
 }
-impl<F> SubAssign for Vec4D<F>
-where
-    F: Float + Debug + Display,
-{
+impl<F: Float> SubAssign for Vec4D<F> {
     fn sub_assign(&mut self, rhs: Self) {
-        self.x = self.x - rhs.x;
-        self.y = self.y - rhs.y;
-        self.z = self.z - rhs.z;
-        self.w = self.w - rhs.w;
+        *self = *self - rhs;
     }
 }
-impl<F> Mul<F> for Vec4D<F>
-where
-    F: Float + Debug + Display,
-{
+impl<F: Float> Mul<F> for Vec4D<F> {
     type Output = Vec4D<F>;
     fn mul(self, rhs: F) -> Self::Output {
         Vec4D::new(self.x * rhs, self.y * rhs, self.z * rhs, self.w * rhs)
     }
 }
-impl<F> Div<F> for Vec4D<F>
-where
-    F: Float + Debug + Display,
-{
+impl<F: Float> Div<F> for Vec4D<F> {
     type Output = Vec4D<F>;
     fn div(self, rhs: F) -> Self::Output {
         Vec4D::new(self.x / rhs, self.y / rhs, self.z / rhs, self.w / rhs)
     }
 }
-impl<F> Neg for Vec4D<F>
-where
-    F: Float + Debug + Display,
-{
+impl<F: Float> Neg for Vec4D<F> {
     type Output = Self;
     fn neg(self) -> Self::Output {
         Vec4D::new(-self.x, -self.y, -self.z, -self.w)
     }
 }
-impl<F> MulAssign<F> for Vec4D<F>
-where
-    F: Float + Debug + Display,
-{
+impl<F: Float> MulAssign<F> for Vec4D<F> {
     fn mul_assign(&mut self, rhs: F) {
-        self.x = self.x * rhs;
-        self.y = self.y * rhs;
-        self.z = self.z * rhs;
-        self.w = self.w * rhs;
+        *self = *self * rhs;
     }
 }
-impl<F> DivAssign<F> for Vec4D<F>
-where
-    F: Float + Debug + Display,
-{
+impl<F: Float> DivAssign<F> for Vec4D<F> {
     fn div_assign(&mut self, rhs: F) {
-        self.x = self.x / rhs;
-        self.y = self.y / rhs;
-        self.z = self.z / rhs;
-        self.w = self.w / rhs;
+        *self = *self / rhs;
     }
 }
-impl<F> Display for Vec4D<F>
-where
-    F: Float + Debug + Display,
-{
+impl<F: Float> Display for Vec4D<F> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "({}, {}, {}, {})", self.x, self.y, self.z, self.w)
     }
 }
-impl<F: Float> VectorSpace<F> for Vec4D<F>
-where
-    F: Float + Debug + Display,
-{
+impl<F: Float> VectorSpace<F> for Vec4D<F> {
     fn zero() -> Self {
         let z = F::zero();
         Self::new(z, z, z, z)
     }
-    fn elements(&self) -> Vec<F> {
-        vec![
-            self.x.clone(),
-            self.y.clone(),
-            self.z.clone(),
-            self.w.clone(),
-        ]
+    fn elements(&self) -> impl Iterator<Item = F> {
+        [self.x, self.y, self.z, self.w].into_iter()
     }
 }
 
@@ -576,7 +427,7 @@ pub mod tests {
 
     pub fn strategy_vec2d<F, SF>(strategy_f: SF) -> BoxedStrategy<Vec2D<F>>
     where
-        F: Float + Debug + Display,
+        F: Float,
         SF: Strategy<Value = F> + Clone + 'static,
     {
         (strategy_f.clone(), strategy_f)
@@ -586,7 +437,7 @@ pub mod tests {
 
     pub fn strategy_vec3d<F, SF>(strategy_f: SF) -> BoxedStrategy<Vec3D<F>>
     where
-        F: Float + Debug + Display,
+        F: Float,
         SF: Strategy<Value = F> + Clone + 'static,
     {
         (strategy_f.clone(), strategy_f.clone(), strategy_f.clone())
@@ -596,7 +447,7 @@ pub mod tests {
 
     pub fn strategy_vec4d<F, SF>(strategy_f: SF) -> BoxedStrategy<Vec4D<F>>
     where
-        F: Float + Debug + Display,
+        F: Float,
         SF: Strategy<Value = F> + Clone + 'static,
     {
         (
@@ -611,12 +462,12 @@ pub mod tests {
 
     pub fn elementwise_approx_eq<F, V, C>(a: V, b: V, approx_eq: C) -> bool
     where
-        F: Float + Debug + Display,
+        F: Float,
         V: VectorSpace<F>,
         C: Fn(F, F) -> bool,
     {
-        let a_elems = a.elements();
-        let b_elems = b.elements();
+        let a_elems = a.elements().collect::<Vec<F>>();
+        let b_elems = b.elements().collect::<Vec<F>>();
         assert!(a_elems.len() == b_elems.len());
         a_elems
             .into_iter()
@@ -632,7 +483,7 @@ pub mod tests {
         b: F,
         eq: C,
     ) where
-        F: Float + Debug + Display,
+        F: Float,
         V: VectorSpace<F>,
         C: Fn(V, V) -> bool,
     {
@@ -729,7 +580,7 @@ pub mod tests {
         approx_eq: C,
         n_cases: u32,
     ) where
-        F: Float + Debug + Display,
+        F: Float,
         V: VectorSpace<F>,
         SF: Strategy<Value = F> + Clone,
         SV: Strategy<Value = V> + Clone,
@@ -759,7 +610,7 @@ pub mod tests {
         eq_f: CF,
         eq_v: CV,
     ) where
-        F: Float + Debug + Display,
+        F: Float,
         V: VectorSpace<F> + ProjectiveEmbedding<F, V> + PartialEq,
         CF: Fn(F, F) -> bool + Clone,
         CV: Fn(V, V) -> bool + Clone,
@@ -775,31 +626,12 @@ pub mod tests {
 
             // Check homogeneous coordinate.
             x.elements()
-                .into_iter()
                 .map(|xe| w * xe)
-                .zip(V::weighted_control_point(h).elements().into_iter())
+                .zip(V::weighted_control_point(h).elements())
                 .for_each(|(xh, wch)| {
                     assert_approx_eq!(xh, wch, eq_f);
                 });
         }
-
-        /*
-        // Construct the embedding into the projective / homogeneous space and
-        // check that its elements are correct.
-        let h = V::embed(x, w);
-        let mut expected_h_elements = x.elements();
-        expected_h_elements.push(w);
-        assert_eq!(expected_h_elements, h.elements());
-
-        // Check that get_vector and get_weight return correct values.
-        assert_eq!(x, V::get_vector_from_homogeneous(&h));
-        assert_eq!(w, V::get_weight_from_homogeneous(&h));
-
-        // Project / de-homogenise from the projective space.
-        if !w.is_zero() {
-            assert_approx_eq!(x / w, V::project(h), eq);
-        }
-        */
     }
 
     pub fn prop_projective_embedding<F, V, SF, SV, CF, CV>(
@@ -809,7 +641,7 @@ pub mod tests {
         approx_eq_v: CV,
         n_cases: u32,
     ) where
-        F: Float + Debug + Display,
+        F: Float,
         V: VectorSpace<F> + ProjectiveEmbedding<F, V> + PartialEq,
         SF: Strategy<Value = F> + Clone,
         SV: Strategy<Value = V> + Clone,
@@ -832,7 +664,7 @@ pub mod tests {
 
     pub fn check_interp<F, V, CF, CV>(p0: V, p1: V, u: F, eq_f: CF, eq_v: CV)
     where
-        F: Float + Debug + Display,
+        F: Float,
         V: VectorSpace<F>,
         CF: Fn(F, F) -> bool,
         CV: Fn(V, V) -> bool,
@@ -862,7 +694,7 @@ pub mod tests {
         approx_eq_v: CV,
         n_cases: u32,
     ) where
-        F: Float + Debug + Display,
+        F: Float,
         V: VectorSpace<F>,
         SF: Strategy<Value = F> + Clone,
         SV: Strategy<Value = V> + Clone,

@@ -1,3 +1,5 @@
+use core::fmt::{Debug, Display};
+
 mod control_point;
 mod rational_bezier_curve;
 mod vector_space;
@@ -13,3 +15,7 @@ use vector_space::interp;
 
 #[cfg(test)]
 pub mod test_util;
+
+/// Alias for `num_traits` Float that adds `Debug` and `Display`.
+pub trait Float: num_traits::Float + Debug + Display {}
+impl<T: num_traits::Float + Debug + Display> Float for T {}
