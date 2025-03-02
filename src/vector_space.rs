@@ -22,7 +22,10 @@ pub trait VectorSpace<F: Float>:
     + MulAssign<F>
     + DivAssign<F>
 {
+    /// Returns the zero (additive identity) of the vector space.
     fn zero() -> Self;
+
+    /// Returns an iterator over the elements of the vector space.
     fn elements(&self) -> impl Iterator<Item = F>;
 }
 
@@ -53,8 +56,9 @@ where
     p0 * (F::one() - u) + p1 * u
 }
 
-/// Embeds a vector space into homogeneous coordinates for rational Bézier and
-/// NURBS geometry.
+/// Embeds a vector space into homogeneous coordinates.
+///
+/// This is useful for both rational Bézier and NURBS geometry.
 ///
 /// Rational Bézier curves and NURBS require control points with homogeneous
 /// weights. This trait converts standard control points into their homogeneous
@@ -76,9 +80,9 @@ where
 ///
 /// In the nomenclature of homogeneous coordinates, there are three key values:
 ///
-/// - **Euclidean control points**: $P = (x_1, x_2, \dots, x_n)$. These are
-///   the positions of the control points in Euclidean space.
-/// - **Weighted control points**: $R = (w x_1, w x_2, \dots, w x_n)$.
+/// - **Euclidean control points**: $\mathbf{P} = (x_1, x_2, \dots, x_n)$.
+///   These are the positions of the control points in Euclidean space.
+/// - **Weighted control points**: $\mathbf{R} = (w x_1, w x_2, \dots, w x_n)$.
 ///   These represent the control points in homogeneous space before projective
 ///   division.
 /// - **Weight**: $w$. This is the scalar weight associated with each
@@ -106,6 +110,9 @@ where
     /// \mathrm{embed}(\mathbf{P}, w) \rightarrow \mathbf{Q}
     /// $$
     ///
+    /// This operation can be reversed using [`project`][Self::project] and
+    /// [`weight`][Self::weight] functions.
+    ///
     /// # Parameters
     /// - `v`: The vector to embed.
     /// - `w`: The weight to append.
@@ -114,15 +121,20 @@ where
     /// A homogeneous vector with the additional dimension.
     fn embed(v: V, w: F) -> Self::Homogeneous;
 
+    /// Returns the weighted control point, $\mathbf{R}$.
     fn weighted_control_point(h: Self::Homogeneous) -> V;
 
+    /// Returns the weight, $w$.
     fn weight(h: Self::Homogeneous) -> F;
 
     /// Converts a homogeneous vector back to the original vector space.
     ///
     /// This function performs a perspective division / dehomogenization by the
-    /// homogeneous coordinate (if applicable) to return the vector in its
-    /// original space.
+    /// homogeneous coordinate, to return the vector in its original space.
+    ///
+    /// $$
+    /// \mathrm{project}(\mathbf{Q}) \rightarrow \mathbf{P}
+    /// $$
     ///
     /// # Parameters
     /// - `h`: The homogeneous vector to project.

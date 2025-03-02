@@ -3,19 +3,19 @@ use core::fmt::{Debug, Display};
 use num_traits::Float;
 
 /// Rational Bézier curve.
-pub struct RationalBezierCurve<F, V>
+pub struct BezierCurve<F, V>
 where
     F: Float + Debug + Display,
     V: VectorSpace<F> + ProjectiveEmbedding<F, V>,
 {
     control_points: Vec<ControlPoint<F, V>>,
 }
-impl<F, V> RationalBezierCurve<F, V>
+impl<F, V> BezierCurve<F, V>
 where
     F: Float + Debug + Display,
     V: VectorSpace<F> + ProjectiveEmbedding<F, V>,
 {
-    /// Creates a new `RationalBezierCurve`.
+    /// Creates a new `BezierCurve`.
     ///
     /// # Parameters
     ///
@@ -23,7 +23,7 @@ where
     ///
     /// # Returns
     ///
-    /// A new `RationalBezierCurve`.
+    /// A new `BezierCurve`.
     pub fn new(control_points: Vec<ControlPoint<F, V>>) -> Self {
         assert!(
             control_points.len() >= 2,

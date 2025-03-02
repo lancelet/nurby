@@ -1,15 +1,16 @@
 use core::fmt::{Debug, Display};
 
+mod bezier_curve;
 mod control_point;
-mod rational_bezier_curve;
 mod vector_space;
 
+pub use bezier_curve::BezierCurve;
 pub use control_point::ControlPoint;
-pub use rational_bezier_curve::RationalBezierCurve;
 
 pub use vector_space::ProjectiveEmbedding;
 pub use vector_space::Vec2D;
 pub use vector_space::Vec3D;
+pub use vector_space::Vec4D;
 pub use vector_space::VectorSpace;
 use vector_space::interp;
 
