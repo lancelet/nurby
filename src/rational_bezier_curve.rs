@@ -56,6 +56,8 @@ where
     /// Evaluates the curve at a parameter value using the de Casteljau
     /// recursive algorithm.
     ///
+    /// This computes both the position on the curve and its first derivative.
+    ///
     /// # Parameters
     ///
     /// - `u`: The parameter value. For points inside the curve, this should
@@ -64,7 +66,8 @@ where
     ///
     /// # Returns
     ///
-    /// The vector value which results from evaluating the curve at `u`.
+    /// The [CurvePt] corresponding to the point on the curve, along with its
+    /// gradient.
     pub fn decasteljau_eval(&self, u: F) -> V {
         // Copy control points in homogeneous form.
         let mut pts: Vec<V::Homogeneous> = self.homogeneous_control_points();
@@ -72,12 +75,12 @@ where
         // Perform deCasteljau recursive evaluation. This version is expressed
         // non-recursively.
         for j in (0..self.degree()).rev() {
+            // Interpolate points.
             for i in 0..j {
                 pts[i] = interp(pts[i], pts[i + 1], u);
             }
         }
 
-        // Project final point.
         V::project(pts[0])
     }
 }

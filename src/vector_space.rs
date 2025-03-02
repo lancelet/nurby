@@ -56,14 +56,39 @@ where
     p0 * (F::one() - u) + p1 * u
 }
 
-/// Defines a projective embedding for a vector space.
+/// Embeds a vector space into homogeneous coordinates for rational Bézier and
+/// NURBS geometry.
 ///
-/// This trait allows a vector space to be embedded into a higher-dimensional
-/// homogeneous space, provided that such an embedding exists for the types
-/// available.
+/// Rational Bézier curves and NURBS require control points with homogeneous
+/// weights. This trait converts standard control points into their homogeneous
+/// form, allowing for perspective-correct interpolation and exact
+/// representations of conics.
 ///
-/// It is separate from [VectorSpace] because not all vector spaces support
-/// projective embeddings.
+/// For example, a 2D control point $(x, y)$ with weight $w$ is mapped to:
+///
+/// $$
+/// \mathbf{Q} = (w x, w y, w)
+/// $$
+///
+/// More generally, an $n$-dimensional control point $(x_1, \dots, x_n)$
+/// becomes:
+///
+/// $$
+/// \mathbf{Q} = (w x_1, \dots, w x_n, w)
+/// $$
+///
+/// In the nomenclature of homogeneous coordinates, there are three key values:
+///
+/// - **Euclidean control points**: $P = (x_1, x_2, \dots, x_n)$. These are
+///   the positions of the control points in Euclidean space.
+/// - **Weighted control points**: $R = (w x_1, w x_2, \dots, w x_n)$.
+///   These represent the control points in homogeneous space before projective
+///   division.
+/// - **Weight**: $w$. This is the scalar weight associated with each
+///   control point, influencing its contribution to the final curve or surface.
+///
+/// This trait is distinct from [VectorSpace] because not all vector spaces
+/// support projective embeddings required for rational splines.
 pub trait ProjectiveEmbedding<F, V>
 where
     F: Float + Debug + Display,
@@ -78,7 +103,11 @@ where
     /// Converts a vector into its homogeneous form by appending a weight.
     ///
     /// This function maps a vector from its current space into the homogeneous
-    /// space by adding a weight component.
+    /// space by adding a weight component:
+    ///
+    /// $$
+    /// \mathrm{embed}(\mathbf{P}, w) \rightarrow \mathbf{Q}
+    /// $$
     ///
     /// # Parameters
     /// - `v`: The vector to embed.
@@ -88,12 +117,9 @@ where
     /// A homogeneous vector with the additional dimension.
     fn embed(v: V, w: F) -> Self::Homogeneous;
 
-    /// Returns the vector component of the homogeneous coordinate, WITHOUT
-    /// normalizing (ie. no division by the weight).
-    fn get_vector_from_homogeneous(h: &Self::Homogeneous) -> V;
+    fn weighted_control_point(h: Self::Homogeneous) -> V;
 
-    /// Returns the weight component of the homogeneous coordinate.
-    fn get_weight_from_homogeneous(h: &Self::Homogeneous) -> F;
+    fn weight(h: Self::Homogeneous) -> F;
 
     /// Converts a homogeneous vector back to the original vector space.
     ///
@@ -221,16 +247,18 @@ where
 {
     type Homogeneous = Vec3D<F>;
     fn embed(v: Vec2D<F>, w: F) -> Self::Homogeneous {
-        Vec3D::new(v.x, v.y, w)
+        Vec3D::new(w * v.x, w * v.y, w)
     }
     fn project(h: Self::Homogeneous) -> Vec2D<F> {
         let w = h.z;
         Vec2D::new(h.x / w, h.y / w)
     }
-    fn get_vector_from_homogeneous(h: &Self::Homogeneous) -> Vec2D<F> {
+
+    fn weighted_control_point(h: Self::Homogeneous) -> Vec2D<F> {
         Vec2D::new(h.x, h.y)
     }
-    fn get_weight_from_homogeneous(h: &Self::Homogeneous) -> F {
+
+    fn weight(h: Self::Homogeneous) -> F {
         h.z
     }
 }
@@ -364,15 +392,15 @@ where
 {
     type Homogeneous = Vec4D<F>;
     fn embed(v: Vec3D<F>, w: F) -> Self::Homogeneous {
-        Vec4D::new(v.x, v.y, v.z, w)
+        Vec4D::new(w * v.x, w * v.y, w * v.z, w)
     }
     fn project(h: Self::Homogeneous) -> Vec3D<F> {
         Vec3D::new(h.x / h.w, h.y / h.w, h.z / h.w)
     }
-    fn get_vector_from_homogeneous(h: &Self::Homogeneous) -> Vec3D<F> {
+    fn weighted_control_point(h: Self::Homogeneous) -> Vec3D<F> {
         Vec3D::new(h.x, h.y, h.z)
     }
-    fn get_weight_from_homogeneous(h: &Self::Homogeneous) -> F {
+    fn weight(h: Self::Homogeneous) -> F {
         h.w
     }
 }
@@ -725,12 +753,37 @@ pub mod tests {
             .unwrap()
     }
 
-    pub fn check_projective_embedding<F, V, C>(x: V, w: F, eq: C)
-    where
+    pub fn check_projective_embedding<F, V, CF, CV>(
+        x: V,
+        w: F,
+        eq_f: CF,
+        eq_v: CV,
+    ) where
         F: Float + Debug + Display,
         V: VectorSpace<F> + ProjectiveEmbedding<F, V> + PartialEq,
-        C: Fn(V, V) -> bool,
+        CF: Fn(F, F) -> bool + Clone,
+        CV: Fn(V, V) -> bool + Clone,
     {
+        // Only work with non-zero weights.
+        if !w.is_zero() {
+            // Embed in homogeneous coordinates.
+            let h = V::embed(x, w);
+
+            // Check Euclidean coordinate and weight.
+            assert_approx_eq!(V::project(h), x, eq_v);
+            assert_approx_eq!(V::weight(h), w, eq_f);
+
+            // Check homogeneous coordinate.
+            x.elements()
+                .into_iter()
+                .map(|xe| w * xe)
+                .zip(V::weighted_control_point(h).elements().into_iter())
+                .for_each(|(xh, wch)| {
+                    assert_approx_eq!(xh, wch, eq_f);
+                });
+        }
+
+        /*
         // Construct the embedding into the projective / homogeneous space and
         // check that its elements are correct.
         let h = V::embed(x, w);
@@ -746,24 +799,32 @@ pub mod tests {
         if !w.is_zero() {
             assert_approx_eq!(x / w, V::project(h), eq);
         }
+        */
     }
 
-    pub fn prop_projective_embedding<F, V, SF, SV, C>(
+    pub fn prop_projective_embedding<F, V, SF, SV, CF, CV>(
         strategy_f: SF,
         strategy_v: SV,
-        approx_eq: C,
+        approx_eq_f: CF,
+        approx_eq_v: CV,
         n_cases: u32,
     ) where
         F: Float + Debug + Display,
         V: VectorSpace<F> + ProjectiveEmbedding<F, V> + PartialEq,
         SF: Strategy<Value = F> + Clone,
         SV: Strategy<Value = V> + Clone,
-        C: Fn(V, V) -> bool + Clone,
+        CF: Fn(F, F) -> bool + Clone,
+        CV: Fn(V, V) -> bool + Clone,
     {
         let mut runner = TestRunner::new(Config::with_cases(n_cases));
         runner
             .run(&(strategy_v.clone(), strategy_f.clone()), |(x, w)| {
-                check_projective_embedding(x, w, approx_eq.clone());
+                check_projective_embedding(
+                    x,
+                    w,
+                    approx_eq_f.clone(),
+                    approx_eq_v.clone(),
+                );
                 Ok(())
             })
             .unwrap()
@@ -869,6 +930,7 @@ pub mod tests {
         prop_projective_embedding(
             reasonable_f32(true),
             strategy_vec2d(reasonable_f32(true)),
+            |a, b| approx_eq(a, b, abstol, reltol),
             |x, y| {
                 elementwise_approx_eq(x, y, |a, b| {
                     approx_eq(a, b, abstol, reltol)
@@ -921,6 +983,7 @@ pub mod tests {
         prop_projective_embedding(
             reasonable_f32(true),
             strategy_vec3d(reasonable_f32(true)),
+            |a, b| approx_eq(a, b, abstol, reltol),
             |x, y| {
                 elementwise_approx_eq(x, y, |a, b| {
                     approx_eq(a, b, abstol, reltol)
@@ -1008,6 +1071,7 @@ pub mod tests {
         prop_projective_embedding(
             reasonable_f64(true),
             strategy_vec2d(reasonable_f64(true)),
+            |a, b| approx_eq(a, b, abstol, reltol),
             |x, y| {
                 elementwise_approx_eq(x, y, |a, b| {
                     approx_eq(a, b, abstol, reltol)
@@ -1060,6 +1124,7 @@ pub mod tests {
         prop_projective_embedding(
             reasonable_f64(true),
             strategy_vec3d(reasonable_f64(true)),
+            |a, b| approx_eq(a, b, abstol, reltol),
             |x, y| {
                 elementwise_approx_eq(x, y, |a, b| {
                     approx_eq(a, b, abstol, reltol)
