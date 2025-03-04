@@ -1,12 +1,20 @@
-use crate::algebra::{Field, ProjectiveEmbedding, Vec2D, Vec3D, VectorSpace};
+use crate::{Float, ProjectiveEmbedding, Vec2D, Vec3D, VectorSpace};
+use core::fmt::Debug;
 
 /// Rational control point.
 #[derive(Debug, Clone)]
-pub struct ControlPoint<F: Field, V: VectorSpace<F>> {
-    location: V,
-    weight: F,
+pub struct ControlPoint<F, V>
+where
+    F: Float,
+    V: VectorSpace<F> + ProjectiveEmbedding<F, V>,
+{
+    homogeneous: V::Homogeneous,
 }
-impl<F: Field, V: VectorSpace<F>> ControlPoint<F, V> {
+impl<F, V> ControlPoint<F, V>
+where
+    F: Float,
+    V: VectorSpace<F> + ProjectiveEmbedding<F, V>,
+{
     /// Creates a new `ControlPoint`.
     ///
     /// # Parameters
@@ -18,9 +26,30 @@ impl<F: Field, V: VectorSpace<F>> ControlPoint<F, V> {
     ///
     /// A new `ControlPoint`.
     pub fn new(location: V, weight: F) -> Self {
-        Self { location, weight }
+        Self {
+            homogeneous: V::embed(location, weight),
+        }
     }
 
+    /// Returns the location of the `ControlPoint`.
+    pub fn location(&self) -> V {
+        V::project(self.homogeneous)
+    }
+
+    /// Returns the weight of the `ControlPoint`.
+    pub fn weight(&self) -> F {
+        V::weight(self.homogeneous)
+    }
+
+    /// Return the homogeneous coordinate of the `ControlPoint`.
+    pub fn homogeneous(&self) -> &V::Homogeneous {
+        &self.homogeneous
+    }
+}
+impl<F> ControlPoint<F, Vec2D<F>>
+where
+    F: Float,
+{
     /// Creates a `ControlPoint` in 2D Cartesian space.
     ///
     /// # Parameters
@@ -35,7 +64,11 @@ impl<F: Field, V: VectorSpace<F>> ControlPoint<F, V> {
     pub fn in_2d(x: F, y: F, w: F) -> ControlPoint<F, Vec2D<F>> {
         ControlPoint::new(Vec2D::new(x, y), w)
     }
-
+}
+impl<F> ControlPoint<F, Vec3D<F>>
+where
+    F: Float,
+{
     /// Creates a `ControlPoint` in 3D Cartesian space.
     ///
     /// # Parameters
@@ -50,27 +83,5 @@ impl<F: Field, V: VectorSpace<F>> ControlPoint<F, V> {
     /// A 3D vector control point.
     pub fn in_3d(x: F, y: F, z: F, w: F) -> ControlPoint<F, Vec3D<F>> {
         ControlPoint::new(Vec3D::new(x, y, z), w)
-    }
-
-    /// Returns the location of the `ControlPoint`.
-    pub fn location(&self) -> &V {
-        &self.location
-    }
-
-    /// Returns the weight of the `ControlPoint`.
-    pub fn weight(&self) -> &F {
-        &self.weight
-    }
-
-    /// Returns a homogeneous vector containing the control point coordinates
-    /// and its weight.
-    ///
-    /// This uses a projective embedding, which is a trait that associates the
-    /// correct vector spaces with each other.
-    pub fn to_homogeneous<E>(&self) -> E::Homogeneous
-    where
-        E: ProjectiveEmbedding<F, V>,
-    {
-        E::embed(&self.location, &self.weight)
     }
 }
