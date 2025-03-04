@@ -1,19 +1,18 @@
-use crate::{ProjectiveEmbedding, Vec2D, Vec3D, VectorSpace};
-use core::fmt::{Debug, Display};
-use num_traits::Float;
+use crate::{Float, ProjectiveEmbedding, Vec2D, Vec3D, VectorSpace};
+use core::fmt::Debug;
 
 /// Rational control point.
 #[derive(Debug, Clone)]
 pub struct ControlPoint<F, V>
 where
-    F: Float + Debug + Display,
+    F: Float,
     V: VectorSpace<F> + ProjectiveEmbedding<F, V>,
 {
     homogeneous: V::Homogeneous,
 }
 impl<F, V> ControlPoint<F, V>
 where
-    F: Float + Debug + Display,
+    F: Float,
     V: VectorSpace<F> + ProjectiveEmbedding<F, V>,
 {
     /// Creates a new `ControlPoint`.
@@ -32,6 +31,25 @@ where
         }
     }
 
+    /// Returns the location of the `ControlPoint`.
+    pub fn location(&self) -> V {
+        V::project(self.homogeneous)
+    }
+
+    /// Returns the weight of the `ControlPoint`.
+    pub fn weight(&self) -> F {
+        V::weight(self.homogeneous)
+    }
+
+    /// Return the homogeneous coordinate of the `ControlPoint`.
+    pub fn homogeneous(&self) -> &V::Homogeneous {
+        &self.homogeneous
+    }
+}
+impl<F> ControlPoint<F, Vec2D<F>>
+where
+    F: Float,
+{
     /// Creates a `ControlPoint` in 2D Cartesian space.
     ///
     /// # Parameters
@@ -46,7 +64,11 @@ where
     pub fn in_2d(x: F, y: F, w: F) -> ControlPoint<F, Vec2D<F>> {
         ControlPoint::new(Vec2D::new(x, y), w)
     }
-
+}
+impl<F> ControlPoint<F, Vec3D<F>>
+where
+    F: Float,
+{
     /// Creates a `ControlPoint` in 3D Cartesian space.
     ///
     /// # Parameters
@@ -61,20 +83,5 @@ where
     /// A 3D vector control point.
     pub fn in_3d(x: F, y: F, z: F, w: F) -> ControlPoint<F, Vec3D<F>> {
         ControlPoint::new(Vec3D::new(x, y, z), w)
-    }
-
-    /// Returns the location of the `ControlPoint`.
-    pub fn location(&self) -> V {
-        V::project(self.homogeneous)
-    }
-
-    /// Returns the weight of the `ControlPoint`.
-    pub fn weight(&self) -> F {
-        V::weight(self.homogeneous)
-    }
-
-    /// Return the homogeneous coordinate of the `ControlPoint`.
-    pub fn homogeneous(&self) -> &V::Homogeneous {
-        &self.homogeneous
     }
 }

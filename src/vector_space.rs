@@ -38,6 +38,9 @@ pub trait VectorSpace<F: Float>:
 /// a value of `u = 0`, the value `p0` is returned, while for a value
 /// of `u = 1`, the value `p1` is returned.
 ///
+/// This is "affine interpolation". For interpolation of homogeneous values,
+/// please see the [interp_h] function.
+///
 /// # Parameters
 ///
 /// - `p0`: Origin point, corresponding to `u = 0`.
@@ -53,7 +56,7 @@ where
     F: Float,
     V: VectorSpace<F>,
 {
-    p0 * (F::one() - u) + p1 * u
+    p0 + (p1 - p0) * u
 }
 
 /// Embeds a vector space into homogeneous coordinates.
@@ -147,8 +150,8 @@ where
 /// 2D vector.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Vec2D<F: Float> {
-    x: F,
-    y: F,
+    pub x: F,
+    pub y: F,
 }
 impl<F: Float> Vec2D<F> {
     pub fn new(x: F, y: F) -> Self {
@@ -222,11 +225,9 @@ impl<F: Float> ProjectiveEmbedding<F, Vec2D<F>> for Vec2D<F> {
         }
         Vec2D::new(h.x / w, h.y / w)
     }
-
     fn weighted_control_point(h: Self::Homogeneous) -> Vec2D<F> {
         Vec2D::new(h.x, h.y)
     }
-
     fn weight(h: Self::Homogeneous) -> F {
         h.z
     }

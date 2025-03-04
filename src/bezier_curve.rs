@@ -74,7 +74,7 @@ where
 
         // Perform deCasteljau recursive evaluation. This version is expressed
         // non-recursively.
-        for j in (0..self.degree()).rev() {
+        for j in (0..=self.degree()).rev() {
             // Interpolate points.
             for i in 0..j {
                 pts[i] = interp(pts[i], pts[i + 1], u);
@@ -88,12 +88,27 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::{Vec2D, assert_approx_eq, test_util::approx_eq};
     use proptest::prelude::*;
 
-    /*
     proptest! {
+        /// Points evaluated on a rational Bézier quarter circle must have a
+        /// radius of 1.
         #[test]
-        fn prop_circle(u in )
+        fn prop_circle(u in 0f64..1f64) {
+            // Quarter circle
+            let q_circle = BezierCurve::new(
+                vec![
+                    ControlPoint::in_2d(1.0, 0.0, 1.0),
+                    ControlPoint::in_2d(1.0, 1.0, 1.0 / 2.0.sqrt()),
+                    ControlPoint::in_2d(0.0, 1.0, 1.0)
+                ]
+            );
+
+            // Evaluate a point on the circle.
+            let p: Vec2D<f64> = q_circle.decasteljau_eval(u);
+            let r = (p.x * p.x + p.y * p.y).sqrt();
+            assert_approx_eq!(1f64, r, |a, b| approx_eq(a, b, 1e-12, 1e-12));
+        }
     }
-    */
 }
